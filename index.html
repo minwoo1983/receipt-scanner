@@ -256,13 +256,6 @@
   }
   .camera-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* EDIT ENTRY SCREEN */
-  #edit-entry { padding: 0; }
-  .edit-drive-link { display:flex; align-items:center; gap:0.5rem; background:var(--accent-light); border-radius:var(--radius-sm); padding:0.6rem 0.9rem; margin-bottom:1rem; font-size:0.82rem; color:var(--accent); text-decoration:none; }
-  .edit-drive-link:hover { opacity:0.85; }
-  .btn-delete { width:100%; padding:0.75rem; background:none; color:var(--err); border:1px solid var(--err); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; cursor:pointer; margin-top:0.5rem; }
-  .btn-delete:hover { background:var(--err-light); }
-
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #1a1917; --surface: #242320; --surface2: #2c2b28;
@@ -447,6 +440,14 @@
       <label class="form-label">Notes (optional)</label>
       <textarea class="form-textarea" id="m-notes" placeholder="Any additional notes..."></textarea>
     </div>
+    <div class="form-field">
+      <label class="form-label">⏱ REPS Hours</label>
+      <input type="text" class="form-input" id="m-reps" placeholder="e.g. 2.5" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">🚗 Mileage</label>
+      <input type="text" class="form-input" id="m-mileage" placeholder="e.g. 34.2" />
+    </div>
     <button class="btn-confirm" onclick="saveManualEntry()">✔ Save Entry</button>
   </div>
 </div>
@@ -487,6 +488,14 @@
       <div class="review-field-label">Notes</div>
       <textarea id="r-notes" placeholder="Any additional notes..."></textarea>
     </div>
+    <div class="review-field">
+      <div class="review-field-label">⏱ REPS Hours</div>
+      <input type="text" id="r-reps" placeholder="e.g. 2.5" />
+    </div>
+    <div class="review-field">
+      <div class="review-field-label">🚗 Mileage</div>
+      <input type="text" id="r-mileage" placeholder="e.g. 34.2" />
+    </div>
 
     <hr class="review-divider">
     <button class="btn-confirm" onclick="confirmEntry()">✔ Confirm & Save</button>
@@ -501,8 +510,8 @@
     <div class="screen-title">✏️ Edit Entry</div>
   </div>
   <div class="screen-body">
-    <div id="edit-drive-link-wrap" style="display:none">
-      <a id="edit-drive-link" class="edit-drive-link" target="_blank" rel="noopener">
+    <div id="edit-drive-link-wrap" style="display:none;margin-bottom:1rem;">
+      <a id="edit-drive-link" href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:0.5rem;background:var(--accent-light);border-radius:var(--radius-sm);padding:0.6rem 0.9rem;font-size:0.82rem;color:var(--accent);text-decoration:none;">
         <span>📎</span><span>View receipt on Google Drive ↗</span>
       </a>
     </div>
@@ -528,14 +537,22 @@
     </div>
     <div class="form-field">
       <label class="form-label">💬 Comments</label>
-      <textarea class="form-textarea" id="e-comments" placeholder="Any notes about this purchase..."></textarea>
+      <textarea class="form-textarea" id="e-notes" placeholder="Any notes about this purchase..."></textarea>
+    </div>
+    <div class="form-field">
+      <label class="form-label">⏱ REPS Hours</label>
+      <input type="text" class="form-input" id="e-reps" placeholder="e.g. 2.5" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">🚗 Mileage</label>
+      <input type="text" class="form-input" id="e-mileage" placeholder="e.g. 34.2" />
     </div>
     <button class="btn-confirm" onclick="saveEditedEntry()">✔ Save Changes</button>
-    <button class="btn-delete" onclick="deleteEntry()">🗑 Delete This Entry</button>
+    <button class="btn-delete" onclick="deleteEntry()" style="width:100%;padding:0.75rem;background:none;color:var(--err);border:1px solid var(--err);border-radius:var(--radius-sm);font-size:0.9rem;font-family:inherit;cursor:pointer;margin-top:0.5rem;">🗑 Delete This Entry</button>
   </div>
 </div>
 
-
+<!-- ========== FOLDER PICKER ========== -->
 <div class="screen" id="folder-picker">
   <div class="screen-header">
     <button class="back-btn" onclick="showScreen('home')">←</button>
@@ -924,7 +941,9 @@ async function confirmEntry() {
     items: document.getElementById('r-items').value,
     amount: document.getElementById('r-amount').value,
     card: document.getElementById('r-card').value,
-    comments: document.getElementById('r-notes').value,
+    notes: document.getElementById('r-notes').value,
+    reps: document.getElementById('r-reps').value,
+    mileage: document.getElementById('r-mileage').value,
     type: pendingFileType,
     driveLink: '',
     savedAt: new Date().toISOString()
@@ -964,7 +983,9 @@ function saveManualEntry() {
     items: document.getElementById('m-items').value,
     amount: document.getElementById('m-amount').value,
     card: document.getElementById('m-card').value,
-    comments: document.getElementById('m-notes').value,
+    notes: document.getElementById('m-notes').value,
+    reps: document.getElementById('m-reps').value,
+    mileage: document.getElementById('m-mileage').value,
     type: 'manual',
     driveLink: '',
     savedAt: new Date().toISOString()
@@ -972,7 +993,7 @@ function saveManualEntry() {
   if (!entry.vendor) { showToast('Please enter a vendor name', 'error'); return; }
   entries.unshift(entry);
   saveEntries();
-  ['m-date','m-vendor','m-items','m-amount','m-card','m-notes'].forEach(id => document.getElementById(id).value = '');
+  ['m-date','m-vendor','m-items','m-amount','m-card','m-notes','m-reps','m-mileage'].forEach(id => document.getElementById(id).value = '');
   showToast('Entry saved! ✅', 'success');
   showScreen('home');
 }
@@ -1041,7 +1062,7 @@ function renderSpreadsheet() {
   }
   wrap.innerHTML = `<table class="data-table">
     <thead><tr>
-      <th>Date of Purchase</th><th>Vendor</th><th>Description of Item</th><th>Amount</th><th>Credit Card Used</th><th>Comments</th><th>Receipt</th>
+      <th>Date of Purchase</th><th>Vendor</th><th>Description of Item</th><th>Amount</th><th>Credit Card Used</th><th>Comments</th><th>REPS Hours</th><th>Mileage</th><th>Receipt</th>
     </tr></thead>
     <tbody>${entries.map(e=>`<tr onclick="openEditEntry('${e.id}')" style="cursor:pointer;">
       <td style="white-space:nowrap">${e.date||''}</td>
@@ -1049,7 +1070,9 @@ function renderSpreadsheet() {
       <td style="max-width:130px;word-break:break-word">${e.items||''}</td>
       <td style="white-space:nowrap">${e.amount||''}</td>
       <td style="white-space:nowrap">${e.card||''}</td>
-      <td style="max-width:110px;word-break:break-word">${e.comments||''}</td>
+      <td style="max-width:110px;word-break:break-word">${e.notes||''}</td>
+      <td style="white-space:nowrap">${e.reps||''}</td>
+      <td style="white-space:nowrap">${e.mileage||''}</td>
       <td>${e.driveLink ? `<a href="${e.driveLink}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:0.8rem;white-space:nowrap;">📎 View</a>` : '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
@@ -1057,8 +1080,8 @@ function renderSpreadsheet() {
 
 function exportCSV() {
   if (entries.length === 0) { showToast('No entries to export', 'error'); return; }
-  const headers = ['Date of Purchase','Vendor','Description of Item','Amount','Credit Card Used','Comments','Receipt Link'];
-  const rows = entries.map(e => [e.date, e.vendor, e.items, e.amount, e.card, e.comments, e.driveLink||''].map(v => `"${(v||'').replace(/"/g,'""')}"`));
+  const headers = ['Date of Purchase','Vendor','Description of Item','Amount','Credit Card Used','Comments','REPS Hours','Mileage','Receipt Link'];
+  const rows = entries.map(e => [e.date, e.vendor, e.items, e.amount, e.card, e.notes||'', e.reps||'', e.mileage||'', e.driveLink||''].map(v => `"${(v||'').replace(/"/g,'""')}"`));
   const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -1067,6 +1090,11 @@ function exportCSV() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV downloaded!', 'success');
+}
+
+async function exportToSheets() {
+  showToast('Tip: Open CSV in Google Sheets via File → Import', 'success');
+  exportCSV();
 }
 
 // ============================================================
@@ -1083,8 +1111,9 @@ function openEditEntry(id) {
   document.getElementById('e-items').value = entry.items || '';
   document.getElementById('e-amount').value = entry.amount || '';
   document.getElementById('e-card').value = entry.card || '';
-  document.getElementById('e-comments').value = entry.comments || entry.notes || '';
-
+  document.getElementById('e-notes').value = entry.notes || '';
+  document.getElementById('e-reps').value = entry.reps || '';
+  document.getElementById('e-mileage').value = entry.mileage || '';
   const linkWrap = document.getElementById('edit-drive-link-wrap');
   const linkEl = document.getElementById('edit-drive-link');
   if (entry.driveLink) {
@@ -1106,7 +1135,9 @@ function saveEditedEntry() {
     items: document.getElementById('e-items').value,
     amount: document.getElementById('e-amount').value,
     card: document.getElementById('e-card').value,
-    comments: document.getElementById('e-comments').value,
+    notes: document.getElementById('e-notes').value,
+    reps: document.getElementById('e-reps').value,
+    mileage: document.getElementById('e-mileage').value,
     editedAt: new Date().toISOString()
   };
   saveEntries();
@@ -1120,11 +1151,6 @@ function deleteEntry() {
   saveEntries();
   showToast('Entry deleted', 'success');
   showScreen('home');
-}
-
-async function exportToSheets() {
-  showToast('Tip: Open CSV in Google Sheets via File → Import', 'success');
-  exportCSV();
 }
 
 // ============================================================
@@ -1158,16 +1184,18 @@ function showToast(msg, type) {
 
 // Pre-fill keys if returning user saved them
 window.onload = () => {
-  // Check if returning from OAuth with saved keys
-  const savedKey = sessionStorage.getItem('anthropic_key');
-  const savedCid = sessionStorage.getItem('google_cid');
-  if (savedKey) document.getElementById('anthropic-key').value = savedKey;
-  if (savedCid) document.getElementById('google-client-id').value = savedCid;
+  const savedKey = localStorage.getItem('anthropic_key');
+  const savedCid = localStorage.getItem('google_cid');
+  if (savedKey) { document.getElementById('anthropic-key').value = savedKey; ANTHROPIC_KEY = savedKey; }
+  if (savedCid) { document.getElementById('google-client-id').value = savedCid; GOOGLE_CLIENT_ID = savedCid; }
+  if (savedKey && savedCid) {
+    document.getElementById('setup-btn').textContent = 'Continue → Sign In with Google';
+  }
 };
 
-// Save keys to session before navigating
-document.getElementById('anthropic-key').addEventListener('change', e => sessionStorage.setItem('anthropic_key', e.target.value));
-document.getElementById('google-client-id').addEventListener('change', e => sessionStorage.setItem('google_cid', e.target.value));
+// Save keys to localStorage whenever they change
+document.getElementById('anthropic-key').addEventListener('input', e => localStorage.setItem('anthropic_key', e.target.value));
+document.getElementById('google-client-id').addEventListener('input', e => localStorage.setItem('google_cid', e.target.value));
 </script>
 </body>
 </html>
