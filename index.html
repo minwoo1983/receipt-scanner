@@ -256,6 +256,13 @@
   }
   .camera-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* EDIT ENTRY SCREEN */
+  #edit-entry { padding: 0; }
+  .edit-drive-link { display:flex; align-items:center; gap:0.5rem; background:var(--accent-light); border-radius:var(--radius-sm); padding:0.6rem 0.9rem; margin-bottom:1rem; font-size:0.82rem; color:var(--accent); text-decoration:none; }
+  .edit-drive-link:hover { opacity:0.85; }
+  .btn-delete { width:100%; padding:0.75rem; background:none; color:var(--err); border:1px solid var(--err); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; cursor:pointer; margin-top:0.5rem; }
+  .btn-delete:hover { background:var(--err-light); }
+
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #1a1917; --surface: #242320; --surface2: #2c2b28;
@@ -294,13 +301,7 @@
     </div>
 
     <button class="btn-primary" id="setup-btn" onclick="initApp()">Connect & Sign In with Google →</button>
-    <div id="saved-keys-note" style="display:none; background:var(--accent-light); color:var(--accent); border-radius:var(--radius-sm); padding:0.75rem 1rem; font-size:0.82rem; margin-top:1rem; text-align:center; line-height:1.5;">
-      ✅ Your keys are saved on this device.<br>Tap Continue to sign in.
-    </div>
-    <div class="setup-note">Your keys are stored only on this device and never sent anywhere except Google and Anthropic directly.</div>
-    <div style="text-align:center; margin-top:0.75rem;">
-      <button onclick="clearSavedKeys()" style="background:none;border:none;color:var(--text3);font-size:0.75rem;cursor:pointer;font-family:inherit;">🗑 Forget saved keys</button>
-    </div>
+    <div class="setup-note">Your keys are never sent anywhere except Google and Anthropic directly from your browser.</div>
   </div>
 </div>
 
@@ -493,7 +494,48 @@
   </div>
 </div>
 
-<!-- ========== FOLDER PICKER ========== -->
+<!-- ========== EDIT ENTRY SCREEN ========== -->
+<div class="screen" id="edit-entry">
+  <div class="screen-header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <div class="screen-title">✏️ Edit Entry</div>
+  </div>
+  <div class="screen-body">
+    <div id="edit-drive-link-wrap" style="display:none">
+      <a id="edit-drive-link" class="edit-drive-link" target="_blank" rel="noopener">
+        <span>📎</span><span>View receipt on Google Drive ↗</span>
+      </a>
+    </div>
+    <div class="form-field">
+      <label class="form-label">📅 Date of Purchase</label>
+      <input type="date" class="form-input" id="e-date" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">🏪 Vendor</label>
+      <input type="text" class="form-input" id="e-vendor" placeholder="Store or vendor name" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">📝 Description of Item</label>
+      <textarea class="form-textarea" id="e-items" placeholder="Describe what was purchased..."></textarea>
+    </div>
+    <div class="form-field">
+      <label class="form-label">💵 Amount</label>
+      <input type="text" class="form-input" id="e-amount" placeholder="e.g. $42.50" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">💳 Credit Card Used</label>
+      <input type="text" class="form-input" id="e-card" placeholder="e.g. Chase Sapphire, Visa ****1234" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">💬 Comments</label>
+      <textarea class="form-textarea" id="e-comments" placeholder="Any notes about this purchase..."></textarea>
+    </div>
+    <button class="btn-confirm" onclick="saveEditedEntry()">✔ Save Changes</button>
+    <button class="btn-delete" onclick="deleteEntry()">🗑 Delete This Entry</button>
+  </div>
+</div>
+
+
 <div class="screen" id="folder-picker">
   <div class="screen-header">
     <button class="back-btn" onclick="showScreen('home')">←</button>
@@ -882,8 +924,9 @@ async function confirmEntry() {
     items: document.getElementById('r-items').value,
     amount: document.getElementById('r-amount').value,
     card: document.getElementById('r-card').value,
-    notes: document.getElementById('r-notes').value,
+    comments: document.getElementById('r-notes').value,
     type: pendingFileType,
+    driveLink: '',
     savedAt: new Date().toISOString()
   };
 
@@ -892,7 +935,8 @@ async function confirmEntry() {
   showLoading('Saving to Google Drive...');
   try {
     if (pendingFileBlob) {
-      await uploadFileToDrive(pendingFileBlob, entry);
+      const link = await uploadFileToDrive(pendingFileBlob, entry);
+      if (link) entry.driveLink = link;
     }
     entries.unshift(entry);
     saveEntries();
@@ -920,8 +964,9 @@ function saveManualEntry() {
     items: document.getElementById('m-items').value,
     amount: document.getElementById('m-amount').value,
     card: document.getElementById('m-card').value,
-    notes: document.getElementById('m-notes').value,
+    comments: document.getElementById('m-notes').value,
     type: 'manual',
+    driveLink: '',
     savedAt: new Date().toISOString()
   };
   if (!entry.vendor) { showToast('Please enter a vendor name', 'error'); return; }
@@ -936,7 +981,7 @@ function saveManualEntry() {
 // GOOGLE DRIVE UPLOAD
 // ============================================================
 async function uploadFileToDrive(blob, entry) {
-  if (!accessToken) return;
+  if (!accessToken) return null;
   const date = entry.date || new Date().toISOString().split('T')[0];
   const vendor = (entry.vendor || 'receipt').replace(/[^a-zA-Z0-9]/g,'_');
   const ext = blob.type === 'application/pdf' ? 'pdf' : 'jpg';
@@ -947,12 +992,14 @@ async function uploadFileToDrive(blob, entry) {
   form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
   form.append('file', blob);
 
-  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + accessToken },
     body: form
   });
   if (!resp.ok) throw new Error('Drive upload failed');
+  const data = await resp.json();
+  return data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`;
 }
 
 // ============================================================
@@ -968,17 +1015,20 @@ function renderEntries() {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No entries yet. Add your first receipt above.</div></div>';
     return;
   }
-  list.innerHTML = entries.slice(0,20).map(e => {
-    const icons = {photo:'📷', pdf:'📄', manual:'✏️'};
-    const badges = {photo:'badge-photo', pdf:'badge-pdf', manual:'badge-manual'};
-    const labels = {photo:'Photo', pdf:'PDF', manual:'Manual'};
-    return `<div class="entry-card">
+  list.innerHTML = entries.slice(0,50).map(e => {
+    const icons = {image:'📷', pdf:'📄', manual:'✏️'};
+    const badges = {image:'badge-photo', pdf:'badge-pdf', manual:'badge-manual'};
+    const labels = {image:'Photo', pdf:'PDF', manual:'Manual'};
+    return `<div class="entry-card" onclick="openEditEntry('${e.id}')" style="cursor:pointer;">
       <div class="entry-icon">${icons[e.type]||'📋'}</div>
       <div class="entry-info">
         <div class="entry-vendor">${e.vendor || 'Unknown vendor'}</div>
-        <div class="entry-meta">${e.date||'No date'} · <span class="badge ${badges[e.type]||''}">${labels[e.type]||e.type}</span> · ${e.card||'No card'}</div>
+        <div class="entry-meta">${e.date||'No date'} · <span class="badge ${badges[e.type]||''}">${labels[e.type]||e.type}</span>${e.card ? ' · ' + e.card : ''}</div>
       </div>
-      <div class="entry-amount">${e.amount||'—'}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.25rem;flex-shrink:0;">
+        <div class="entry-amount">${e.amount||'—'}</div>
+        <div style="font-size:0.65rem;color:var(--text3);">tap to edit</div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -991,24 +1041,24 @@ function renderSpreadsheet() {
   }
   wrap.innerHTML = `<table class="data-table">
     <thead><tr>
-      <th>Date</th><th>Vendor</th><th>Items</th><th>Amount</th><th>Card</th><th>Type</th><th>Notes</th>
+      <th>Date of Purchase</th><th>Vendor</th><th>Description of Item</th><th>Amount</th><th>Credit Card Used</th><th>Comments</th><th>Receipt</th>
     </tr></thead>
-    <tbody>${entries.map(e=>`<tr>
-      <td>${e.date||''}</td>
-      <td>${e.vendor||''}</td>
-      <td style="max-width:120px;word-break:break-word">${e.items||''}</td>
-      <td>${e.amount||''}</td>
-      <td>${e.card||''}</td>
-      <td>${e.type||''}</td>
-      <td style="max-width:100px;word-break:break-word">${e.notes||''}</td>
+    <tbody>${entries.map(e=>`<tr onclick="openEditEntry('${e.id}')" style="cursor:pointer;">
+      <td style="white-space:nowrap">${e.date||''}</td>
+      <td style="white-space:nowrap">${e.vendor||''}</td>
+      <td style="max-width:130px;word-break:break-word">${e.items||''}</td>
+      <td style="white-space:nowrap">${e.amount||''}</td>
+      <td style="white-space:nowrap">${e.card||''}</td>
+      <td style="max-width:110px;word-break:break-word">${e.comments||''}</td>
+      <td>${e.driveLink ? `<a href="${e.driveLink}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:0.8rem;white-space:nowrap;">📎 View</a>` : '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
 
 function exportCSV() {
   if (entries.length === 0) { showToast('No entries to export', 'error'); return; }
-  const headers = ['Date','Vendor','Items Purchased','Amount','Credit Card','Type','Notes'];
-  const rows = entries.map(e => [e.date,e.vendor,e.items,e.amount,e.card,e.type,e.notes].map(v => `"${(v||'').replace(/"/g,'""')}"`));
+  const headers = ['Date of Purchase','Vendor','Description of Item','Amount','Credit Card Used','Comments','Receipt Link'];
+  const rows = entries.map(e => [e.date, e.vendor, e.items, e.amount, e.card, e.comments, e.driveLink||''].map(v => `"${(v||'').replace(/"/g,'""')}"`));
   const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -1017,6 +1067,59 @@ function exportCSV() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV downloaded!', 'success');
+}
+
+// ============================================================
+// EDIT / DELETE ENTRIES
+// ============================================================
+let editingEntryId = null;
+
+function openEditEntry(id) {
+  const entry = entries.find(e => String(e.id) === String(id));
+  if (!entry) return;
+  editingEntryId = entry.id;
+  document.getElementById('e-date').value = entry.date || '';
+  document.getElementById('e-vendor').value = entry.vendor || '';
+  document.getElementById('e-items').value = entry.items || '';
+  document.getElementById('e-amount').value = entry.amount || '';
+  document.getElementById('e-card').value = entry.card || '';
+  document.getElementById('e-comments').value = entry.comments || entry.notes || '';
+
+  const linkWrap = document.getElementById('edit-drive-link-wrap');
+  const linkEl = document.getElementById('edit-drive-link');
+  if (entry.driveLink) {
+    linkEl.href = entry.driveLink;
+    linkWrap.style.display = 'block';
+  } else {
+    linkWrap.style.display = 'none';
+  }
+  showScreen('edit-entry');
+}
+
+function saveEditedEntry() {
+  const idx = entries.findIndex(e => String(e.id) === String(editingEntryId));
+  if (idx === -1) { showToast('Entry not found', 'error'); return; }
+  entries[idx] = {
+    ...entries[idx],
+    date: document.getElementById('e-date').value,
+    vendor: document.getElementById('e-vendor').value,
+    items: document.getElementById('e-items').value,
+    amount: document.getElementById('e-amount').value,
+    card: document.getElementById('e-card').value,
+    comments: document.getElementById('e-comments').value,
+    editedAt: new Date().toISOString()
+  };
+  saveEntries();
+  showToast('Entry updated! ✅', 'success');
+  showScreen('home');
+}
+
+function deleteEntry() {
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  entries = entries.filter(e => String(e.id) !== String(editingEntryId));
+  saveEntries();
+  showToast('Entry deleted', 'success');
+  showScreen('home');
 }
 
 async function exportToSheets() {
@@ -1053,38 +1156,18 @@ function showToast(msg, type) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function clearSavedKeys() {
-  localStorage.removeItem('anthropic_key');
-  localStorage.removeItem('google_cid');
-  document.getElementById('anthropic-key').value = '';
-  document.getElementById('google-client-id').value = '';
-  document.getElementById('saved-keys-note').style.display = 'none';
-  document.getElementById('setup-btn').textContent = 'Connect & Sign In with Google →';
-  showToast('Saved keys cleared', 'success');
-}
-
-// Pre-fill keys and auto-login if returning user
+// Pre-fill keys if returning user saved them
 window.onload = () => {
-  const savedKey = localStorage.getItem('anthropic_key');
-  const savedCid = localStorage.getItem('google_cid');
+  // Check if returning from OAuth with saved keys
+  const savedKey = sessionStorage.getItem('anthropic_key');
+  const savedCid = sessionStorage.getItem('google_cid');
   if (savedKey) document.getElementById('anthropic-key').value = savedKey;
   if (savedCid) document.getElementById('google-client-id').value = savedCid;
-
-  // If both keys are saved, auto-populate and show a "continue" option
-  if (savedKey && savedCid) {
-    ANTHROPIC_KEY = savedKey;
-    GOOGLE_CLIENT_ID = savedCid;
-    const btn = document.getElementById('setup-btn');
-    btn.textContent = 'Continue →';
-    // Add a note that keys are remembered
-    const note = document.getElementById('saved-keys-note');
-    if (note) note.style.display = 'block';
-  }
 };
 
-// Save keys to localStorage whenever they change
-document.getElementById('anthropic-key').addEventListener('input', e => localStorage.setItem('anthropic_key', e.target.value));
-document.getElementById('google-client-id').addEventListener('input', e => localStorage.setItem('google_cid', e.target.value));
+// Save keys to session before navigating
+document.getElementById('anthropic-key').addEventListener('change', e => sessionStorage.setItem('anthropic_key', e.target.value));
+document.getElementById('google-client-id').addEventListener('change', e => sessionStorage.setItem('google_cid', e.target.value));
 </script>
 </body>
 </html>
